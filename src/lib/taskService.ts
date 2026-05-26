@@ -7,11 +7,23 @@ const LOCAL_STORAGE_KEY = 'task-tracker-local-tasks';
 const getLocalTasks = (userId: string): Task[] => {
   if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (!stored) {
+  let allTasks: Task[] = [];
+  if (stored) {
+    try {
+      allTasks = JSON.parse(stored);
+    } catch (e) {
+      allTasks = [];
+    }
+  }
+
+  // Check if current user has any tasks
+  const userTasks = allTasks.filter(t => t.user_id === userId);
+
+  if (userTasks.length === 0) {
     // Return some beautiful onboarding seed data for the user
     const defaultTasks: Task[] = [
       {
-        id: 'seed-1',
+        id: 'seed-1-' + userId,
         title: 'Configure Supabase variables',
         description: 'Set your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY inside .env.local to link this app to your Supabase backend.',
         is_completed: false,
@@ -21,7 +33,7 @@ const getLocalTasks = (userId: string): Task[] => {
         user_id: userId
       },
       {
-        id: 'seed-2',
+        id: 'seed-2-' + userId,
         title: 'Run database setup script',
         description: 'Copy the contents of supabase-schema.sql and execute them in your Supabase SQL Editor to spin up the tasks table with user isolation.',
         is_completed: false,
@@ -31,7 +43,7 @@ const getLocalTasks = (userId: string): Task[] => {
         user_id: userId
       },
       {
-        id: 'seed-3',
+        id: 'seed-3-' + userId,
         title: 'Enjoy private tasks',
         description: 'Authentication is fully active! Your tasks are private and isolated to your account. Switch accounts or log out to see task security in action.',
         is_completed: true,
@@ -42,16 +54,14 @@ const getLocalTasks = (userId: string): Task[] => {
         user_id: userId
       }
     ];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(defaultTasks));
+    
+    // Save these seed tasks so they persist in the shared localStorage
+    const mergedTasks = [...allTasks, ...defaultTasks];
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedTasks));
     return defaultTasks;
   }
-  try {
-    const allTasks: Task[] = JSON.parse(stored);
-    // Return only tasks belonging to the current user
-    return allTasks.filter(t => t.user_id === userId);
-  } catch (e) {
-    return [];
-  }
+  
+  return userTasks;
 };
 
 const saveLocalTasks = (updatedUserTasks: Task[], userId: string) => {
@@ -78,7 +88,8 @@ export const taskService = {
       return { success: false, error: 'Supabase is not configured' };
     }
     try {
-      const { error } = await supabase.from('tasks').select('id').limit(1);
+      // Select both id and user_id to verify the authentication schema is fully set up
+      const { error } = await supabase.from('tasks').select('id, user_id').limit(1);
       if (error) {
         return { success: false, error: error.message };
       }

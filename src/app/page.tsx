@@ -51,13 +51,16 @@ export default function Home() {
 
   // Handle local mock session & Supabase Auth listeners
   useEffect(() => {
+    let active = true;
+    let subscription: any = null;
+
     async function initAuth() {
       try {
         if (!isSupabaseConfigured || !supabase) {
           setDbStatus('local');
           // Check local simulated user
           const stored = localStorage.getItem('task-tracker-mock-user');
-          if (stored) {
+          if (stored && active) {
             try {
               setUser(JSON.parse(stored));
             } catch (e) {
@@ -66,33 +69,46 @@ export default function Home() {
           }
         } else {
           const conn = await taskService.testConnection();
-          if (conn.success) {
-            setDbStatus('connected');
-          } else {
-            setDbStatus('failed');
-            setDbError(conn.error || 'Unknown connection error');
+          if (active) {
+            if (conn.success) {
+              setDbStatus('connected');
+            } else {
+              setDbStatus('failed');
+              setDbError(conn.error || 'Unknown connection error');
+            }
           }
 
           // Fetch initial session
           const { data: { session } } = await supabase.auth.getSession();
-          setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+          if (active) {
+            setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+          }
 
           // Listen for auth changes
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+          const { data: { subscription: sub } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (active) {
+              setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+            }
           });
-
-          return () => {
-            subscription.unsubscribe();
-          };
+          subscription = sub;
         }
       } catch (err) {
         console.error('Failed to initialize auth:', err);
       } finally {
-        setAuthLoading(false);
+        if (active) {
+          setAuthLoading(false);
+        }
       }
     }
+
     initAuth();
+
+    return () => {
+      active = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
   }, []);
 
   // Fetch tasks when user session changes
@@ -148,11 +164,17 @@ export default function Home() {
 
   // Handlers
   const handleLogout = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
-    } else {
-      localStorage.removeItem('task-tracker-mock-user');
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signOut();
+      } else {
+        localStorage.removeItem('task-tracker-mock-user');
+      }
+    } catch (err) {
+      console.error('Error signing out:', err);
+    } finally {
       setUser(null);
+      setTasks([]);
     }
   };
 
@@ -441,7 +463,11 @@ export default function Home() {
                 {dbError}
               </div>
               <p className="text-xs text-zinc-450 leading-relaxed">
-                {dbError?.toLowerCase().includes('relation') || dbError?.toLowerCase().includes('tasks') ? (
+                {dbError?.toLowerCase().includes('column') || dbError?.toLowerCase().includes('user_id') ? (
+                  <span>
+                    👉 <strong>Missing Auth Schema Column:</strong> The <code className="text-indigo-400 font-mono">tasks</code> table is missing the <code className="text-rose-455 font-mono">user_id</code> column. Please run the script in <code className="text-indigo-400 font-mono">supabase-schema.sql</code> in your <strong>Supabase SQL Editor</strong> to drop the table and recreate it with authentication support and RLS.
+                  </span>
+                ) : dbError?.toLowerCase().includes('relation') || dbError?.toLowerCase().includes('tasks') ? (
                   <span>
                     👉 <strong>Missing Table:</strong> The <code className="text-indigo-400 font-mono">tasks</code> table might be missing in your Supabase database. Please copy the SQL from <code className="text-indigo-400 font-mono">supabase-schema.sql</code> and execute it in your <strong>Supabase SQL Editor</strong>.
                   </span>
