@@ -3,12 +3,12 @@ import { Task, CreateTaskInput, UpdateTaskInput } from '@/types/task';
 
 const LOCAL_STORAGE_KEY = 'task-tracker-local-tasks';
 
-// Get fallback tasks from local storage
-const getLocalTasks = (): Task[] => {
+// Get fallback tasks from local storage scoped to current user
+const getLocalTasks = (userId: string): Task[] => {
   if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
   if (!stored) {
-    // Return some beautiful seed data so the workspace looks alive on first open
+    // Return some beautiful onboarding seed data for the user
     const defaultTasks: Task[] = [
       {
         id: 'seed-1',
@@ -18,40 +18,58 @@ const getLocalTasks = (): Task[] => {
         created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
         due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         priority: 'high',
+        user_id: userId
       },
       {
         id: 'seed-2',
         title: 'Run database setup script',
-        description: 'Copy the contents of supabase-schema.sql and execute them in your Supabase SQL Editor to spin up the tasks table.',
+        description: 'Copy the contents of supabase-schema.sql and execute them in your Supabase SQL Editor to spin up the tasks table with user isolation.',
         is_completed: false,
         created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
         due_date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         priority: 'medium',
+        user_id: userId
       },
       {
         id: 'seed-3',
-        title: 'Enjoy mock offline mode',
-        description: 'While you setup Supabase, this app is fully functional using localStorage! Go ahead and add, edit, or delete tasks.',
+        title: 'Enjoy private tasks',
+        description: 'Authentication is fully active! Your tasks are private and isolated to your account. Switch accounts or log out to see task security in action.',
         is_completed: true,
         created_at: new Date(Date.now() - 3600000 * 48).toISOString(),
         due_date: null,
         priority: 'low',
         completed_at: new Date(Date.now() - 3600000 * 47).toISOString(),
+        user_id: userId
       }
     ];
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(defaultTasks));
     return defaultTasks;
   }
   try {
-    return JSON.parse(stored);
+    const allTasks: Task[] = JSON.parse(stored);
+    // Return only tasks belonging to the current user
+    return allTasks.filter(t => t.user_id === userId);
   } catch (e) {
     return [];
   }
 };
 
-const saveLocalTasks = (tasks: Task[]) => {
+const saveLocalTasks = (updatedUserTasks: Task[], userId: string) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
+  const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+  let allTasks: Task[] = [];
+  if (stored) {
+    try {
+      allTasks = JSON.parse(stored);
+    } catch (e) {
+      allTasks = [];
+    }
+  }
+  // Keep only tasks that do NOT belong to this user
+  const otherUsersTasks = allTasks.filter(t => t.user_id !== userId);
+  // Merge and save
+  const mergedTasks = [...updatedUserTasks, ...otherUsersTasks];
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedTasks));
 };
 
 export const taskService = {
@@ -70,28 +88,29 @@ export const taskService = {
     }
   },
 
-  async fetchTasks(): Promise<Task[]> {
+  async fetchTasks(userId: string): Promise<Task[]> {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from('tasks')
           .select('*')
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
         if (error) {
           console.error('Supabase fetch failed. Falling back to localStorage.', error);
-          return getLocalTasks();
+          return getLocalTasks(userId);
         }
         return data || [];
       } catch (err) {
         console.error('Supabase connection failed. Falling back to localStorage.', err);
-        return getLocalTasks();
+        return getLocalTasks(userId);
       }
     }
-    return getLocalTasks();
+    return getLocalTasks(userId);
   },
 
-  async addTask(input: CreateTaskInput): Promise<Task> {
+  async addTask(input: CreateTaskInput, userId: string): Promise<Task> {
     const tempId = typeof crypto !== 'undefined' && crypto.randomUUID 
       ? crypto.randomUUID() 
       : Math.random().toString(36).substring(2, 11);
@@ -104,6 +123,7 @@ export const taskService = {
       created_at: new Date().toISOString(),
       due_date: input.due_date || null,
       priority: input.priority,
+      user_id: userId
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -115,35 +135,36 @@ export const taskService = {
             description: input.description || null,
             due_date: input.due_date || null,
             priority: input.priority,
-            is_completed: false
+            is_completed: false,
+            user_id: userId
           }])
           .select()
           .single();
 
         if (error) {
           console.error('Supabase insert failed. Saving to localStorage.', error);
-          const tasks = getLocalTasks();
+          const tasks = getLocalTasks(userId);
           tasks.unshift(newTask);
-          saveLocalTasks(tasks);
+          saveLocalTasks(tasks, userId);
           return newTask;
         }
         return data;
       } catch (err) {
         console.error('Supabase connection failed on insert. Saving to localStorage.', err);
-        const tasks = getLocalTasks();
+        const tasks = getLocalTasks(userId);
         tasks.unshift(newTask);
-        saveLocalTasks(tasks);
+        saveLocalTasks(tasks, userId);
         return newTask;
       }
     }
 
-    const tasks = getLocalTasks();
+    const tasks = getLocalTasks(userId);
     tasks.unshift(newTask);
-    saveLocalTasks(tasks);
+    saveLocalTasks(tasks, userId);
     return newTask;
   },
 
-  async updateTask(id: string, updates: UpdateTaskInput): Promise<Task> {
+  async updateTask(id: string, updates: UpdateTaskInput, userId: string): Promise<Task> {
     const finalUpdates = { ...updates };
     if (updates.is_completed !== undefined) {
       finalUpdates.completed_at = updates.is_completed ? new Date().toISOString() : null;
@@ -155,16 +176,17 @@ export const taskService = {
           .from('tasks')
           .update(finalUpdates)
           .eq('id', id)
+          .eq('user_id', userId)
           .select()
           .single();
 
         if (error) {
-          console.error('Supabase update failed. Appyling to localStorage.', error);
-          const tasks = getLocalTasks();
+          console.error('Supabase update failed. Applying to localStorage.', error);
+          const tasks = getLocalTasks(userId);
           const idx = tasks.findIndex(t => t.id === id);
           if (idx !== -1) {
             tasks[idx] = { ...tasks[idx], ...finalUpdates } as Task;
-            saveLocalTasks(tasks);
+            saveLocalTasks(tasks, userId);
             return tasks[idx];
           }
           throw error;
@@ -172,54 +194,55 @@ export const taskService = {
         return data;
       } catch (err) {
         console.error('Supabase connection failed on update. Applying to localStorage.', err);
-        const tasks = getLocalTasks();
+        const tasks = getLocalTasks(userId);
         const idx = tasks.findIndex(t => t.id === id);
         if (idx !== -1) {
           tasks[idx] = { ...tasks[idx], ...finalUpdates } as Task;
-          saveLocalTasks(tasks);
+          saveLocalTasks(tasks, userId);
           return tasks[idx];
         }
         throw err;
       }
     }
 
-    const tasks = getLocalTasks();
+    const tasks = getLocalTasks(userId);
     const idx = tasks.findIndex(t => t.id === id);
     if (idx !== -1) {
       tasks[idx] = { ...tasks[idx], ...finalUpdates } as Task;
-      saveLocalTasks(tasks);
+      saveLocalTasks(tasks, userId);
       return tasks[idx];
     }
     throw new Error('Task not found in offline database.');
   },
 
-  async deleteTask(id: string): Promise<void> {
+  async deleteTask(id: string, userId: string): Promise<void> {
     if (isSupabaseConfigured && supabase) {
       try {
         const { error } = await supabase
           .from('tasks')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('user_id', userId);
 
         if (error) {
           console.error('Supabase delete failed. Applying to localStorage.', error);
-          const tasks = getLocalTasks();
+          const tasks = getLocalTasks(userId);
           const filtered = tasks.filter(t => t.id !== id);
-          saveLocalTasks(filtered);
+          saveLocalTasks(filtered, userId);
           return;
         }
         return;
       } catch (err) {
         console.error('Supabase connection failed on delete. Applying to localStorage.', err);
-        const tasks = getLocalTasks();
+        const tasks = getLocalTasks(userId);
         const filtered = tasks.filter(t => t.id !== id);
-        saveLocalTasks(filtered);
+        saveLocalTasks(filtered, userId);
         return;
       }
     }
 
-    const tasks = getLocalTasks();
+    const tasks = getLocalTasks(userId);
     const filtered = tasks.filter(t => t.id !== id);
-    saveLocalTasks(filtered);
+    saveLocalTasks(filtered, userId);
   }
 };

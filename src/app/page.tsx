@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { Task, CreateTaskInput, UpdateTaskInput, Priority } from '@/types/task';
 import { taskService } from '@/lib/taskService';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import TaskStats from '@/components/TaskStats';
 import TaskForm from '@/components/TaskForm';
 import TaskCard from '@/components/TaskCard';
+import AuthForm from '@/components/AuthForm';
 import { 
   Database, 
   Sparkles, 
@@ -21,7 +22,9 @@ import {
   PieChart,
   LayoutGrid,
   BarChart3,
-  Award
+  Award,
+  LogOut,
+  User as UserIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -36,18 +39,31 @@ export default function Home() {
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'failed' | 'local'>('checking');
   const [dbError, setDbError] = useState<string | null>(null);
   const [showTamasCalc, setShowTamasCalc] = useState(false);
+
+  // Authentication states
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   
   // Filter and Sort states
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority[]>(['low', 'medium', 'high']);
 
-  // Load tasks on mount
+  // Handle local mock session & Supabase Auth listeners
   useEffect(() => {
-    async function loadTasks() {
+    async function initAuth() {
       try {
-        if (!isSupabaseConfigured) {
+        if (!isSupabaseConfigured || !supabase) {
           setDbStatus('local');
+          // Check local simulated user
+          const stored = localStorage.getItem('task-tracker-mock-user');
+          if (stored) {
+            try {
+              setUser(JSON.parse(stored));
+            } catch (e) {
+              setUser(null);
+            }
+          }
         } else {
           const conn = await taskService.testConnection();
           if (conn.success) {
@@ -56,8 +72,42 @@ export default function Home() {
             setDbStatus('failed');
             setDbError(conn.error || 'Unknown connection error');
           }
+
+          // Fetch initial session
+          const { data: { session } } = await supabase.auth.getSession();
+          setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+
+          // Listen for auth changes
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ? { id: session.user.id, email: session.user.email || '' } : null);
+          });
+
+          return () => {
+            subscription.unsubscribe();
+          };
         }
-        const fetched = await taskService.fetchTasks();
+      } catch (err) {
+        console.error('Failed to initialize auth:', err);
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+    initAuth();
+  }, []);
+
+  // Fetch tasks when user session changes
+  useEffect(() => {
+    if (!user) {
+      setTasks([]);
+      return;
+    }
+
+    const currentUserId = user.id;
+
+    async function loadTasks() {
+      setLoading(true);
+      try {
+        const fetched = await taskService.fetchTasks(currentUserId);
         setTasks(fetched);
       } catch (err) {
         console.error('Failed to load tasks:', err);
@@ -66,7 +116,7 @@ export default function Home() {
       }
     }
     loadTasks();
-  }, []);
+  }, [user]);
 
   const [dateTime, setDateTime] = useState<Date | null>(null);
 
@@ -97,10 +147,20 @@ export default function Home() {
   };
 
   // Handlers
+  const handleLogout = async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    } else {
+      localStorage.removeItem('task-tracker-mock-user');
+      setUser(null);
+    }
+  };
+
   const handleAddTask = async (data: CreateTaskInput) => {
+    if (!user) return;
     setSubmitting(true);
     try {
-      const newTask = await taskService.addTask(data);
+      const newTask = await taskService.addTask(data, user.id);
       setTasks((prev) => [newTask, ...prev]);
     } catch (err) {
       console.error('Failed to add task:', err);
@@ -111,8 +171,9 @@ export default function Home() {
   };
 
   const handleUpdateTask = async (id: string, updates: UpdateTaskInput) => {
+    if (!user) return;
     try {
-      const updated = await taskService.updateTask(id, updates);
+      const updated = await taskService.updateTask(id, updates, user.id);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
       if (editingTask?.id === id) {
         setEditingTask(null);
@@ -138,9 +199,10 @@ export default function Home() {
   };
 
   const handleDeleteTask = async (id: string) => {
+    if (!user) return;
     if (confirm('Are you sure you want to delete this task?')) {
       try {
-        await taskService.deleteTask(id);
+        await taskService.deleteTask(id, user.id);
         setTasks((prev) => prev.filter((t) => t.id !== id));
       } catch (err) {
         console.error('Failed to delete task:', err);
@@ -218,6 +280,25 @@ export default function Home() {
   const remainingTasks = sortedTasks.filter((t) => !t.is_completed && !isOverdue(t));
   const completedTasks = sortedTasks.filter((t) => t.is_completed);
 
+  if (authLoading) {
+    return (
+      <div className="flex-grow w-full max-w-7xl mx-auto px-4 flex items-center justify-center min-h-screen">
+        <div className="glass rounded-3xl p-12 flex flex-col items-center justify-center text-zinc-455 gap-3 border border-zinc-850">
+          <Loader2 className="animate-spin text-indigo-500" size={30} />
+          <span className="text-sm font-semibold tracking-wide">Initializing secure workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex-grow w-full max-w-7xl mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
+        <AuthForm onAuthSuccess={(usr) => setUser(usr)} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-screen">
       {/* Upper Header Bar */}
@@ -264,6 +345,25 @@ export default function Home() {
             </div>
           )}
           <div className="flex items-center gap-2.5">
+            {/* User Profile display & Logout */}
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-850 text-xs text-zinc-350 shadow-sm shadow-black/10">
+                <div className="h-5 w-5 rounded-full bg-zinc-850 flex items-center justify-center text-indigo-400">
+                  <UserIcon size={12} />
+                </div>
+                <span className="font-semibold truncate max-w-[120px] sm:max-w-[180px]" title={user.email}>{user.email}</span>
+                <span className="text-zinc-700">|</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-[10px] font-bold text-zinc-400 hover:text-rose-455 transition-colors cursor-pointer flex items-center gap-1"
+                  title="Sign Out"
+                >
+                  <LogOut size={11} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+
             {dbStatus === 'checking' && (
               <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-800/40 text-zinc-400 border border-zinc-800 text-xs font-semibold">
                 <Loader2 size={13} className="animate-spin" />

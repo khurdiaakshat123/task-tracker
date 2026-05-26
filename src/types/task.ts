@@ -9,6 +9,7 @@ export interface Task {
   due_date: string | null;
   priority: Priority;
   completed_at?: string | null;
+  user_id?: string;
 }
 
 export interface CreateTaskInput {

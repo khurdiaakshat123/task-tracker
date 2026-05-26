@@ -13,33 +13,34 @@ CREATE TABLE public.tasks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     due_date TIMESTAMP WITH TIME ZONE,
     priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-    completed_at TIMESTAMP WITH TIME ZONE
+    completed_at TIMESTAMP WITH TIME ZONE,
+    user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
--- Create policies to allow public read, insert, update, and delete access.
-DROP POLICY IF EXISTS "Allow public select" ON public.tasks;
-CREATE POLICY "Allow public select" ON public.tasks 
+-- Create policies to restrict users to their own tasks only
+DROP POLICY IF EXISTS "Allow user select" ON public.tasks;
+CREATE POLICY "Allow user select" ON public.tasks 
     FOR SELECT 
-    USING (true);
+    USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public insert" ON public.tasks;
-CREATE POLICY "Allow public insert" ON public.tasks 
+DROP POLICY IF EXISTS "Allow user insert" ON public.tasks;
+CREATE POLICY "Allow user insert" ON public.tasks 
     FOR INSERT 
-    WITH CHECK (true);
+    WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public update" ON public.tasks;
-CREATE POLICY "Allow public update" ON public.tasks 
+DROP POLICY IF EXISTS "Allow user update" ON public.tasks;
+CREATE POLICY "Allow user update" ON public.tasks 
     FOR UPDATE 
-    USING (true) 
-    WITH CHECK (true);
+    USING (auth.uid() = user_id) 
+    WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Allow public delete" ON public.tasks;
-CREATE POLICY "Allow public delete" ON public.tasks 
+DROP POLICY IF EXISTS "Allow user delete" ON public.tasks;
+CREATE POLICY "Allow user delete" ON public.tasks 
     FOR DELETE 
-    USING (true);
+    USING (auth.uid() = user_id);
 
 -- Force PostgREST to reload the schema cache immediately
 NOTIFY pgrst, 'reload schema';
