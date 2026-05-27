@@ -696,23 +696,15 @@ export default function Home() {
                   <div className="relative">
                     <button
                       onClick={() => setShowTamasTooltip(!showTamasTooltip)}
-                      className={`flex items-center gap-2.5 px-4.5 py-2 rounded-xl border text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
-                        tamasData.score !== null
-                          ? tamasData.score < 0
-                            ? 'bg-emerald-500/5 border-emerald-500/25 text-emerald-400 shadow-sm shadow-emerald-500/5 hover:border-emerald-500/40'
-                            : tamasData.score > 0
-                            ? 'bg-rose-500/5 border-rose-500/25 text-rose-400 shadow-sm shadow-rose-500/5 hover:border-rose-500/40'
-                            : 'bg-zinc-900/80 border-zinc-800 text-zinc-350 hover:border-zinc-700'
-                          : 'bg-zinc-900/80 border-zinc-800 text-zinc-550'
-                      }`}
+                      className="flex items-center gap-3 px-6 py-2.5 rounded-2xl border border-rose-500 bg-rose-950/20 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.12)] transition-all hover:scale-[1.02] hover:border-rose-455 hover:shadow-[0_0_25px_rgba(244,63,94,0.22)] active:scale-[0.98] cursor-pointer"
                     >
-                      <span className="text-[10px] font-extrabold tracking-wider uppercase opacity-85">Tamas Score:</span>
+                      <span className="text-[10px] font-black tracking-widest uppercase text-rose-350 opacity-90">Tamas Index:</span>
                       {tamasData.score !== null ? (
-                        <span className="font-mono text-sm font-black">
+                        <span className="font-mono text-base sm:text-lg font-black text-rose-455">
                           {tamasData.score > 0 ? `+${tamasData.score}` : tamasData.score}
                         </span>
                       ) : (
-                        <span className="font-mono text-xs opacity-60">N/A</span>
+                        <span className="font-mono text-sm text-rose-450/70">N/A</span>
                       )}
                     </button>
 
