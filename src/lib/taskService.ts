@@ -3,6 +3,97 @@ import { Task, CreateTaskInput, UpdateTaskInput } from '@/types/task';
 
 const LOCAL_STORAGE_KEY = 'task-tracker-local-tasks';
 
+// Helper to generate 7 realistic demo tasks to showcase the application features
+const generateDemoTasks = (userId: string): Task[] => {
+  const getPastDateStr = (daysAgo: number) => {
+    return new Date(Date.now() - 3600000 * 24 * daysAgo).toISOString().split('T')[0];
+  };
+  
+  const getFutureDateStr = (daysAhead: number) => {
+    return new Date(Date.now() + 3600000 * 24 * daysAhead).toISOString().split('T')[0];
+  };
+
+  const getPastDateTime = (daysAgo: number) => {
+    return new Date(Date.now() - 3600000 * 24 * daysAgo).toISOString();
+  };
+
+  return [
+    {
+      id: 'demo-1-' + userId,
+      title: 'Fix Auth Session State Leak',
+      description: 'Audit and patch authentication session storage leakage in React client-side lifecycle to secure multi-user environments.',
+      is_completed: false,
+      created_at: getPastDateTime(5),
+      due_date: getPastDateStr(3),
+      priority: 'high',
+      user_id: userId
+    },
+    {
+      id: 'demo-2-' + userId,
+      title: 'Migrate Postgres Database Schema',
+      description: 'Run the supabase-schema.sql script in the Supabase SQL editor to create columns and enable strict Row-Level Security (RLS) policies.',
+      is_completed: false,
+      created_at: getPastDateTime(4),
+      due_date: getPastDateStr(1),
+      priority: 'medium',
+      user_id: userId
+    },
+    {
+      id: 'demo-3-' + userId,
+      title: 'Optimize Donut Chart Performance',
+      description: 'Refactor SVGCircle calculations inside User Analysis dashboard to minimize renders during real-time filters.',
+      is_completed: false,
+      created_at: getPastDateTime(1),
+      due_date: getFutureDateStr(2),
+      priority: 'high',
+      user_id: userId
+    },
+    {
+      id: 'demo-4-' + userId,
+      title: 'Update Developer Onboarding Docs',
+      description: 'Write instructions for connecting other devices to local network address IP for testing purposes.',
+      is_completed: false,
+      created_at: getPastDateTime(0),
+      due_date: getFutureDateStr(5),
+      priority: 'low',
+      user_id: userId
+    },
+    {
+      id: 'demo-5-' + userId,
+      title: 'Implement Tamas Productivity Score',
+      description: 'Design math algorithms to normalize backlog weight indices and cap extreme outliers.',
+      is_completed: true,
+      created_at: getPastDateTime(3),
+      due_date: getPastDateStr(1),
+      priority: 'high',
+      completed_at: getPastDateTime(2),
+      user_id: userId
+    },
+    {
+      id: 'demo-6-' + userId,
+      title: 'Design Glassmorphic Auth Screen',
+      description: 'Stylize a high-fidelity sign-in/register form with interactive borders and custom glows.',
+      is_completed: true,
+      created_at: getPastDateTime(2),
+      due_date: getPastDateStr(1),
+      priority: 'medium',
+      completed_at: getPastDateTime(2),
+      user_id: userId
+    },
+    {
+      id: 'demo-7-' + userId,
+      title: 'Setup Tailwind CSS v4.0 Layout',
+      description: 'Configure index.css styling tokens, glass backgrounds, and standard animations.',
+      is_completed: true,
+      created_at: getPastDateTime(6),
+      due_date: getPastDateStr(4),
+      priority: 'medium',
+      completed_at: getPastDateTime(1),
+      user_id: userId
+    }
+  ];
+};
+
 // Get fallback tasks from local storage scoped to current user
 const getLocalTasks = (userId: string): Task[] => {
   if (typeof window === 'undefined') return [];
@@ -18,46 +109,17 @@ const getLocalTasks = (userId: string): Task[] => {
 
   // Check if current user has any tasks
   const userTasks = allTasks.filter(t => t.user_id === userId);
+  const onboardedKey = `task-tracker-onboarded-${userId}`;
+  const hasOnboarded = localStorage.getItem(onboardedKey) === 'true';
 
-  if (userTasks.length === 0) {
+  if (userTasks.length === 0 && !hasOnboarded) {
     // Return some beautiful onboarding seed data for the user
-    const defaultTasks: Task[] = [
-      {
-        id: 'seed-1-' + userId,
-        title: 'Configure Supabase variables',
-        description: 'Set your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY inside .env.local to link this app to your Supabase backend.',
-        is_completed: false,
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-        due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        priority: 'high',
-        user_id: userId
-      },
-      {
-        id: 'seed-2-' + userId,
-        title: 'Run database setup script',
-        description: 'Copy the contents of supabase-schema.sql and execute them in your Supabase SQL Editor to spin up the tasks table with user isolation.',
-        is_completed: false,
-        created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-        due_date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        priority: 'medium',
-        user_id: userId
-      },
-      {
-        id: 'seed-3-' + userId,
-        title: 'Enjoy private tasks',
-        description: 'Authentication is fully active! Your tasks are private and isolated to your account. Switch accounts or log out to see task security in action.',
-        is_completed: true,
-        created_at: new Date(Date.now() - 3600000 * 48).toISOString(),
-        due_date: null,
-        priority: 'low',
-        completed_at: new Date(Date.now() - 3600000 * 47).toISOString(),
-        user_id: userId
-      }
-    ];
+    const defaultTasks = generateDemoTasks(userId);
     
     // Save these seed tasks so they persist in the shared localStorage
     const mergedTasks = [...allTasks, ...defaultTasks];
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedTasks));
+    localStorage.setItem(onboardedKey, 'true');
     return defaultTasks;
   }
   
@@ -80,6 +142,9 @@ const saveLocalTasks = (updatedUserTasks: Task[], userId: string) => {
   // Merge and save
   const mergedTasks = [...updatedUserTasks, ...otherUsersTasks];
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedTasks));
+  
+  // Set onboarded flag to prevent re-seeding empty state
+  localStorage.setItem(`task-tracker-onboarded-${userId}`, 'true');
 };
 
 export const taskService = {
@@ -112,6 +177,37 @@ export const taskService = {
           console.error('Supabase fetch failed. Falling back to localStorage.', error);
           return getLocalTasks(userId);
         }
+
+        const onboardedKey = `task-tracker-onboarded-${userId}`;
+        const hasOnboarded = typeof window !== 'undefined' && localStorage.getItem(onboardedKey) === 'true';
+
+        if (data && data.length === 0 && !hasOnboarded) {
+          const demoTasks = generateDemoTasks(userId);
+          const { data: seededData, error: seedError } = await supabase
+            .from('tasks')
+            .insert(demoTasks.map(t => ({
+              title: t.title,
+              description: t.description,
+              is_completed: t.is_completed,
+              created_at: t.created_at,
+              due_date: t.due_date,
+              priority: t.priority,
+              completed_at: t.completed_at,
+              user_id: t.user_id
+            })))
+            .select();
+
+          if (seedError) {
+            console.error('Failed to seed demo tasks in Supabase:', seedError);
+            return [];
+          }
+
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(onboardedKey, 'true');
+          }
+          return seededData || demoTasks;
+        }
+
         return data || [];
       } catch (err) {
         console.error('Supabase connection failed. Falling back to localStorage.', err);
