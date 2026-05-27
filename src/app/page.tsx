@@ -324,6 +324,33 @@ export default function Home() {
     }
   };
 
+  const handleResetProfile = async () => {
+    if (!user) return;
+    const confirmation = confirm("Are you sure you want to reset your profile? This will delete ALL your tasks and reset your account onboarding state back to defaults.");
+    if (confirmation) {
+      try {
+        setLoading(true);
+        // Wipe all tasks
+        await taskService.deleteAllTasks(user.id);
+        
+        // Remove onboarding completed flag
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(`task-tracker-onboarded-${user.id}`);
+        }
+        
+        // Re-fetch tasks which auto-seeds 7 demo tasks
+        const seededTasks = await taskService.fetchTasks(user.id);
+        setTasks(seededTasks);
+        alert("Your profile has been successfully reset to default onboarding state.");
+      } catch (err) {
+        console.error("Failed to reset profile:", err);
+        alert("Error resetting profile.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const togglePriorityFilter = (priority: Priority) => {
     setPriorityFilter((prev) => {
       if (prev.includes(priority)) {
@@ -445,6 +472,15 @@ export default function Home() {
                 <span>Back to Board</span>
               </>
             )}
+          </button>
+          
+          <button
+            onClick={handleResetProfile}
+            className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-rose-955/15 border border-rose-900/60 hover:border-rose-500/40 text-rose-455 hover:text-rose-400 hover:bg-rose-950/40 cursor-pointer transition-all shadow-sm shadow-black/10"
+            title="Reset profile history and onboarding"
+          >
+            <AlertTriangle size={13} className="text-rose-500" />
+            <span>Reset Profile</span>
           </button>
         </div>
 
@@ -596,18 +632,17 @@ export default function Home() {
                 <h2 className="text-xl sm:text-2xl font-black tracking-tight text-emerald-400 mb-2 flex items-center gap-2">
                   Create New Task
                 </h2>
-                <p className="text-xs text-zinc-400 mb-6 leading-relaxed">Draft a new item and track your milestones.</p>
-                <TaskForm onSubmit={handleAddTask} isSubmitting={submitting} />
+                <p className="text-xs text-zinc-400 mb-5 leading-relaxed">Draft a new item and track your milestones.</p>
                 
-                {/* Start Over Button */}
-                <div className="mt-6 pt-6 border-t border-zinc-900/70">
-                  <button
-                    onClick={handleStartOver}
-                    className="w-full bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-extrabold py-3 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md shadow-rose-950/15"
-                  >
-                    <span>Start Over From Fresh</span>
-                  </button>
-                </div>
+                {/* Start Over Button - Moved to top for visibility */}
+                <button
+                  onClick={handleStartOver}
+                  className="w-full mb-6 bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-extrabold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md shadow-rose-950/10"
+                >
+                  <span>Start Over From Fresh</span>
+                </button>
+
+                <TaskForm onSubmit={handleAddTask} isSubmitting={submitting} />
               </div>
             </div>
 
