@@ -34,6 +34,8 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [currentView, setCurrentView] = useState<'board' | 'analysis'>('board');
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   
   // Database connection check states
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'failed' | 'local'>('checking');
@@ -324,30 +326,39 @@ export default function Home() {
     }
   };
 
+  const triggerResetProfileModal = () => {
+    setResetConfirmText('');
+    setShowResetModal(true);
+  };
+
   const handleResetProfile = async () => {
     if (!user) return;
-    const confirmation = confirm("Are you sure you want to reset your profile? This will delete ALL your tasks and reset your account onboarding state back to defaults.");
-    if (confirmation) {
-      try {
-        setLoading(true);
-        // Wipe all tasks
-        await taskService.deleteAllTasks(user.id);
-        
-        // Remove onboarding completed flag
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(`task-tracker-onboarded-${user.id}`);
-        }
-        
-        // Re-fetch tasks which auto-seeds 7 demo tasks
-        const seededTasks = await taskService.fetchTasks(user.id);
-        setTasks(seededTasks);
-        alert("Your profile has been successfully reset to default onboarding state.");
-      } catch (err) {
-        console.error("Failed to reset profile:", err);
-        alert("Error resetting profile.");
-      } finally {
-        setLoading(false);
+    if (resetConfirmText !== 'RESET') {
+      alert("Please type 'RESET' to confirm.");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setShowResetModal(false);
+      
+      // Wipe all tasks
+      await taskService.deleteAllTasks(user.id);
+      
+      // Remove onboarding completed flag
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`task-tracker-onboarded-${user.id}`);
       }
+      
+      // Re-fetch tasks which auto-seeds 7 demo tasks
+      const seededTasks = await taskService.fetchTasks(user.id);
+      setTasks(seededTasks);
+      alert("Your profile has been successfully reset to default onboarding state.");
+    } catch (err) {
+      console.error("Failed to reset profile:", err);
+      alert("Error resetting profile.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -475,7 +486,7 @@ export default function Home() {
           </button>
           
           <button
-            onClick={handleResetProfile}
+            onClick={triggerResetProfileModal}
             className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-rose-955/15 border border-rose-900/60 hover:border-rose-500/40 text-rose-455 hover:text-rose-400 hover:bg-rose-950/40 cursor-pointer transition-all shadow-sm shadow-black/10"
             title="Reset profile history and onboarding"
           >
@@ -1524,6 +1535,94 @@ export default function Home() {
                 onCancel={() => setEditingTask(null)}
                 isSubmitting={submitting}
               />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reset Profile Confirmation Modal */}
+      <AnimatePresence>
+        {showResetModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowResetModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-md glass bg-zinc-950 rounded-2xl p-6 shadow-2xl border border-zinc-800 z-10"
+            >
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-zinc-900">
+                <div className="flex items-center gap-2 text-rose-400">
+                  <AlertTriangle size={20} className="stroke-[2.5]" />
+                  <h3 className="text-lg font-bold text-white">Reset Profile?</h3>
+                </div>
+                <button
+                  onClick={() => setShowResetModal(false)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-300 leading-relaxed">
+                  Are you sure you want to reset your profile? This action will:
+                </p>
+                <ul className="list-disc pl-5 text-xs text-zinc-400 space-y-1">
+                  <li>Delete <span className="text-rose-400 font-semibold">ALL</span> of your current tasks permanently.</li>
+                  <li>Clear your local onboarding status.</li>
+                  <li>Re-seed the default 7 demonstration tasks.</li>
+                </ul>
+
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-xs text-rose-400 leading-relaxed">
+                  <strong>Warning:</strong> This process cannot be undone. All database records and local storage backups associated with this profile will be wiped.
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-400 block">
+                    To confirm, please type <span className="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-850">RESET</span> below:
+                  </label>
+                  <input
+                    type="text"
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder="RESET"
+                    className="w-full bg-zinc-900/80 border border-zinc-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all font-semibold uppercase tracking-wider"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(false)}
+                    className="flex-1 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer transition-all text-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetProfile}
+                    disabled={resetConfirmText !== 'RESET'}
+                    className={`flex-1 text-xs font-bold py-2.5 px-4 rounded-xl transition-all text-center flex items-center justify-center gap-1.5 ${
+                      resetConfirmText === 'RESET'
+                        ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-[0.98] shadow-lg shadow-rose-600/20'
+                        : 'bg-zinc-900 text-zinc-600 border border-zinc-850 cursor-not-allowed'
+                    }`}
+                  >
+                    <AlertTriangle size={14} />
+                    <span>Reset Profile</span>
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
