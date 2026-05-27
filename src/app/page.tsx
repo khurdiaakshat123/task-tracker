@@ -39,6 +39,7 @@ export default function Home() {
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'failed' | 'local'>('checking');
   const [dbError, setDbError] = useState<string | null>(null);
   const [showTamasCalc, setShowTamasCalc] = useState(false);
+  const [showTamasTooltip, setShowTamasTooltip] = useState(false);
 
   // Authentication states
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
@@ -587,22 +588,22 @@ export default function Home() {
           {/* Main Grid Content */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-grow">
             {/* Left Side: Create Task Card */}
-            <div className="lg:col-span-3 sticky top-6">
-              <div className="glass bg-emerald-950/10 border-emerald-500/20 shadow-[0_0_25px_rgba(16,185,129,0.02)] rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 text-emerald-800/15 pointer-events-none">
-                  <Sparkles size={40} className="opacity-20 animate-pulse" />
+            <div className="lg:col-span-4 sticky top-6">
+              <div className="glass bg-emerald-950/20 border-emerald-500/35 shadow-[0_0_35px_rgba(16,185,129,0.07)] rounded-3xl p-8 relative overflow-hidden transition-all duration-300 hover:border-emerald-500/45 hover:shadow-[0_0_40px_rgba(16,185,129,0.1)]">
+                <div className="absolute top-0 right-0 p-8 text-emerald-500/10 pointer-events-none">
+                  <Sparkles size={48} className="opacity-30 animate-pulse" />
                 </div>
-                <h2 className="text-lg font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-emerald-400 mb-2 flex items-center gap-2">
                   Create New Task
                 </h2>
-                <p className="text-xs text-zinc-400 mb-5">Draft a new item and track your milestones.</p>
+                <p className="text-xs text-zinc-400 mb-6 leading-relaxed">Draft a new item and track your milestones.</p>
                 <TaskForm onSubmit={handleAddTask} isSubmitting={submitting} />
                 
                 {/* Start Over Button */}
-                <div className="mt-5 pt-5 border-t border-zinc-900/60">
+                <div className="mt-6 pt-6 border-t border-zinc-900/70">
                   <button
                     onClick={handleStartOver}
-                    className="w-full bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-sm shadow-rose-950/10"
+                    className="w-full bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-extrabold py-3 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md shadow-rose-950/15"
                   >
                     <span>Start Over From Fresh</span>
                   </button>
@@ -611,7 +612,7 @@ export default function Home() {
             </div>
 
             {/* Right Side: Task Board & List */}
-            <div className="lg:col-span-9 space-y-6">
+            <div className="lg:col-span-8 space-y-6">
               {/* Controls Bar */}
               <div className="glass rounded-2xl p-4 flex flex-col gap-4">
                 {/* Search and Toggle Filter Button */}
@@ -692,17 +693,61 @@ export default function Home() {
                   </div>
 
                   {/* Tamas Score Badge in Dashboard Controls */}
-                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-zinc-850 bg-zinc-950/40 text-xs font-semibold text-zinc-400">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tamas Score:</span>
-                    {tamasData.score !== null ? (
-                      <span className={`font-mono font-extrabold ${
-                        tamasData.score < 0 ? 'text-emerald-400' : tamasData.score > 0 ? 'text-rose-455' : 'text-zinc-300'
-                      }`}>
-                        {tamasData.score > 0 ? `+${tamasData.score}` : tamasData.score}
-                      </span>
-                    ) : (
-                      <span className="text-zinc-650 font-mono">N/A</span>
-                    )}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowTamasTooltip(!showTamasTooltip)}
+                      className={`flex items-center gap-2.5 px-4.5 py-2 rounded-xl border text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                        tamasData.score !== null
+                          ? tamasData.score < 0
+                            ? 'bg-emerald-500/5 border-emerald-500/25 text-emerald-400 shadow-sm shadow-emerald-500/5 hover:border-emerald-500/40'
+                            : tamasData.score > 0
+                            ? 'bg-rose-500/5 border-rose-500/25 text-rose-400 shadow-sm shadow-rose-500/5 hover:border-rose-500/40'
+                            : 'bg-zinc-900/80 border-zinc-800 text-zinc-350 hover:border-zinc-700'
+                          : 'bg-zinc-900/80 border-zinc-800 text-zinc-550'
+                      }`}
+                    >
+                      <span className="text-[10px] font-extrabold tracking-wider uppercase opacity-85">Tamas Score:</span>
+                      {tamasData.score !== null ? (
+                        <span className="font-mono text-sm font-black">
+                          {tamasData.score > 0 ? `+${tamasData.score}` : tamasData.score}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-xs opacity-60">N/A</span>
+                      )}
+                    </button>
+
+                    <AnimatePresence>
+                      {showTamasTooltip && (
+                        <>
+                          {/* Invisible Backdrop to close tooltip */}
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setShowTamasTooltip(false)}
+                          />
+                          {/* Tooltip Content */}
+                          <motion.div
+                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 glass bg-zinc-950 p-4 rounded-xl shadow-xl border border-zinc-800 z-20 text-center"
+                          >
+                            <p className="text-xs text-zinc-300 font-semibold mb-3 leading-relaxed">
+                              For more details, metrics breakdown, and custom action checklists, go to your Analysis view.
+                            </p>
+                            <button
+                              onClick={() => {
+                                setShowTamasTooltip(false);
+                                setCurrentView('analysis');
+                              }}
+                              className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.97] text-white text-[11px] font-bold py-2 rounded-lg cursor-pointer transition-all"
+                            >
+                              Go to User Analysis
+                            </button>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500 bg-zinc-950/40 border border-zinc-850/50 px-3 py-1 rounded-lg">
