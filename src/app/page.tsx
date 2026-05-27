@@ -630,7 +630,7 @@ export default function Home() {
       )}      {currentView === 'board' ? (
         <>
           {/* Stats Widget */}
-          <TaskStats tasks={tasks} tamasScore={tamasData.score} />
+          <TaskStats tasks={tasks} tamasScore={tamasData.score} onNavigateToAnalysis={() => setCurrentView('analysis')} />
 
           {/* Main Grid Content */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-grow">

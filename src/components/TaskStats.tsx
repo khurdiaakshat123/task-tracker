@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Task } from '@/types/task';
 import { CheckCircle2, Clock, AlertTriangle, Activity, Award } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TaskStatsProps {
   tasks: Task[];
   tamasScore: number | null;
+  onNavigateToAnalysis?: () => void;
 }
 
-export default function TaskStats({ tasks, tamasScore }: TaskStatsProps) {
+export default function TaskStats({ tasks, tamasScore, onNavigateToAnalysis }: TaskStatsProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
   const total = tasks.length;
   const completed = tasks.filter((t) => t.is_completed).length;
   const pending = total - completed;
@@ -77,11 +79,20 @@ export default function TaskStats({ tasks, tamasScore }: TaskStatsProps) {
           initial="hidden"
           animate="visible"
           transition={{ delay: idx * 0.1 }}
-          whileHover={{ y: -4, transition: { duration: 0.2 } }}
-          className={`glass rounded-2xl p-5 relative overflow-hidden transition-all duration-300 ${stat.border}`}
+          whileHover={stat.title === 'Tamas Score' ? { y: -4, scale: 1.01 } : { y: -4 }}
+          onClick={() => {
+            if (stat.title === 'Tamas Score') {
+              setShowTooltip(!showTooltip);
+            }
+          }}
+          className={`glass rounded-2xl p-5 relative transition-all duration-300 ${stat.border} ${
+            stat.title === 'Tamas Score' 
+              ? 'cursor-pointer active:scale-[0.99] z-20' 
+              : 'overflow-hidden'
+          }`}
         >
           {/* Subtle colorful glow inside card */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${stat.bg} pointer-events-none`} />
+          <div className={`absolute inset-0 bg-gradient-to-br ${stat.bg} rounded-2xl pointer-events-none`} />
 
           <div className="flex items-center justify-between relative z-10">
             <div>
@@ -95,6 +106,46 @@ export default function TaskStats({ tasks, tamasScore }: TaskStatsProps) {
               <stat.icon size={22} className="stroke-[1.75]" />
             </div>
           </div>
+
+          {stat.title === 'Tamas Score' && (
+            <AnimatePresence>
+              {showTooltip && (
+                <>
+                  {/* Invisible Backdrop to close tooltip */}
+                  <div 
+                    className="fixed inset-0 z-30" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTooltip(false);
+                    }}
+                  />
+                  {/* Tooltip Content */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-64 glass bg-zinc-950 p-4 rounded-xl shadow-2xl border border-zinc-800 z-40 text-center"
+                  >
+                    <p className="text-xs text-zinc-300 font-semibold mb-3 leading-relaxed">
+                      For more details, metrics breakdown, and productivity checklists, go to User Analysis.
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTooltip(false);
+                        if (onNavigateToAnalysis) onNavigateToAnalysis();
+                      }}
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.97] text-white text-[11px] font-bold py-2 rounded-lg cursor-pointer transition-all"
+                    >
+                      Go to User Analysis
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          )}
         </motion.div>
       ))}
     </div>
