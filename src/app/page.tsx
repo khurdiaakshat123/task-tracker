@@ -487,10 +487,10 @@ export default function Home() {
           
           <button
             onClick={triggerResetProfileModal}
-            className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-rose-955/15 border border-rose-900/60 hover:border-rose-500/40 text-rose-455 hover:text-rose-400 hover:bg-rose-950/40 cursor-pointer transition-all shadow-sm shadow-black/10"
+            className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-850 hover:border-zinc-800 text-zinc-350 hover:text-white hover:bg-zinc-850 cursor-pointer transition-all shadow-sm shadow-black/10"
             title="Reset profile history and onboarding"
           >
-            <AlertTriangle size={13} className="text-rose-500" />
+            <AlertTriangle size={13} className="text-zinc-500" />
             <span>Reset Profile</span>
           </button>
         </div>
@@ -630,17 +630,17 @@ export default function Home() {
       )}      {currentView === 'board' ? (
         <>
           {/* Stats Widget */}
-          <TaskStats tasks={tasks} />
+          <TaskStats tasks={tasks} tamasScore={tamasData.score} />
 
           {/* Main Grid Content */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-grow">
             {/* Left Side: Create Task Card */}
             <div className="lg:col-span-4 sticky top-6">
-              <div className="glass bg-emerald-950/20 border-emerald-500/35 shadow-[0_0_35px_rgba(16,185,129,0.07)] rounded-3xl p-8 relative overflow-hidden transition-all duration-300 hover:border-emerald-500/45 hover:shadow-[0_0_40px_rgba(16,185,129,0.1)]">
-                <div className="absolute top-0 right-0 p-8 text-emerald-500/10 pointer-events-none">
+              <div className="glass bg-indigo-950/20 border-indigo-500/30 shadow-[0_0_35px_rgba(99,102,241,0.07)] rounded-3xl p-8 relative overflow-hidden transition-all duration-300 hover:border-indigo-500/40 hover:shadow-[0_0_40px_rgba(99,102,241,0.1)]">
+                <div className="absolute top-0 right-0 p-8 text-indigo-500/10 pointer-events-none">
                   <Sparkles size={48} className="opacity-30 animate-pulse" />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-emerald-400 mb-2 flex items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-indigo-400 mb-2 flex items-center gap-2">
                   Create New Task
                 </h2>
                 <p className="text-xs text-zinc-400 mb-5 leading-relaxed">Draft a new item and track your milestones.</p>
@@ -648,7 +648,7 @@ export default function Home() {
                 {/* Start Over Button - Moved to top for visibility */}
                 <button
                   onClick={handleStartOver}
-                  className="w-full mb-6 bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-extrabold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md shadow-rose-950/10"
+                  className="w-full mb-6 bg-zinc-900/60 hover:bg-zinc-850 active:scale-[0.98] border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md shadow-black/10"
                 >
                   <span>Start Over From Fresh</span>
                 </button>
@@ -736,57 +736,7 @@ export default function Home() {
                         );
                       })}
                     </div>
-                  </div>
-
-                  {/* Tamas Score Badge in Dashboard Controls */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowTamasTooltip(!showTamasTooltip)}
-                      className="flex items-center gap-3 px-6 py-2.5 rounded-2xl border border-rose-500 bg-rose-950/20 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.12)] transition-all hover:scale-[1.02] hover:border-rose-455 hover:shadow-[0_0_25px_rgba(244,63,94,0.22)] active:scale-[0.98] cursor-pointer"
-                    >
-                      <span className="text-[10px] font-black tracking-widest uppercase text-rose-350 opacity-90">Tamas Index:</span>
-                      {tamasData.score !== null ? (
-                        <span className="font-mono text-base sm:text-lg font-black text-rose-455">
-                          {tamasData.score > 0 ? `+${tamasData.score}` : tamasData.score}
-                        </span>
-                      ) : (
-                        <span className="font-mono text-sm text-rose-450/70">N/A</span>
-                      )}
-                    </button>
-
-                    <AnimatePresence>
-                      {showTamasTooltip && (
-                        <>
-                          {/* Invisible Backdrop to close tooltip */}
-                          <div 
-                            className="fixed inset-0 z-10" 
-                            onClick={() => setShowTamasTooltip(false)}
-                          />
-                          {/* Tooltip Content */}
-                          <motion.div
-                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 glass bg-zinc-950 p-4 rounded-xl shadow-xl border border-zinc-800 z-20 text-center"
-                          >
-                            <p className="text-xs text-zinc-300 font-semibold mb-3 leading-relaxed">
-                              For more details, metrics breakdown, and custom action checklists, go to your Analysis view.
-                            </p>
-                            <button
-                              onClick={() => {
-                                setShowTamasTooltip(false);
-                                setCurrentView('analysis');
-                              }}
-                              className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.97] text-white text-[11px] font-bold py-2 rounded-lg cursor-pointer transition-all"
-                            >
-                              Go to User Analysis
-                            </button>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                    </div>
 
                   <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500 bg-zinc-950/40 border border-zinc-850/50 px-3 py-1 rounded-lg">
                     <span>Sorted: Priority &gt; Due Date</span>

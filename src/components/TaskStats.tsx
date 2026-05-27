@@ -1,13 +1,14 @@
 import React from 'react';
 import { Task } from '@/types/task';
-import { CheckCircle2, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Activity, Award } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface TaskStatsProps {
   tasks: Task[];
+  tamasScore: number | null;
 }
 
-export default function TaskStats({ tasks }: TaskStatsProps) {
+export default function TaskStats({ tasks, tamasScore }: TaskStatsProps) {
   const total = tasks.length;
   const completed = tasks.filter((t) => t.is_completed).length;
   const pending = total - completed;
@@ -56,10 +57,19 @@ export default function TaskStats({ tasks }: TaskStatsProps) {
       bg: 'from-rose-500/10 to-rose-500/0',
       border: 'hover:border-rose-500/30',
     },
+    {
+      title: 'Tamas Score',
+      value: tamasScore !== null ? (tamasScore > 0 ? `+${tamasScore}` : tamasScore) : 'N/A',
+      description: 'Productivity index',
+      icon: Award,
+      color: 'text-purple-400',
+      bg: 'from-purple-500/10 to-purple-500/0',
+      border: 'hover:border-purple-500/30',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
       {statCards.map((stat, idx) => (
         <motion.div
           key={stat.title}
@@ -76,7 +86,7 @@ export default function TaskStats({ tasks }: TaskStatsProps) {
           <div className="flex items-center justify-between relative z-10">
             <div>
               <p className="text-xs font-medium text-zinc-400 tracking-wider uppercase">{stat.title}</p>
-              <h4 className="text-3xl font-bold text-white mt-2 tracking-tight">
+              <h4 className="text-2xl sm:text-3xl font-bold text-white mt-2 tracking-tight">
                 {stat.value}
               </h4>
               <p className="text-xs text-zinc-500 mt-1 font-medium">{stat.description}</p>
