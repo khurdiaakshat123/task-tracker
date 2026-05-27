@@ -255,5 +255,29 @@ export const taskService = {
     const tasks = getLocalTasks(userId);
     const filtered = tasks.filter(t => t.id !== id);
     saveLocalTasks(filtered, userId);
+  },
+
+  async deleteAllTasks(userId: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('Supabase delete all failed. Applying to localStorage.', error);
+          saveLocalTasks([], userId);
+          return;
+        }
+        return;
+      } catch (err) {
+        console.error('Supabase connection failed on delete all. Applying to localStorage.', err);
+        saveLocalTasks([], userId);
+        return;
+      }
+    }
+
+    saveLocalTasks([], userId);
   }
 };

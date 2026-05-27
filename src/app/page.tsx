@@ -49,6 +49,80 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority[]>(['low', 'medium', 'high']);
 
+  // Calculate memoized Tamas score and breakdown details
+  const tamasData = React.useMemo(() => {
+    const tasksWithDeadline = tasks.filter((t) => t.due_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const activeTasks = tasksWithDeadline.filter((t) => {
+      if (t.is_completed) return true;
+      if (t.due_date) {
+        const due = new Date(t.due_date);
+        due.setHours(0, 0, 0, 0);
+        return today > due; // Only count incomplete if it is overdue
+      }
+      return false;
+    });
+
+    if (activeTasks.length === 0) {
+      return {
+        score: null,
+        activeCount: 0,
+        completedCount: 0,
+        overdueCount: 0,
+        completedPoints: 0,
+        overduePoints: 0
+      };
+    }
+
+    let totalPoints = 0;
+    let completedPoints = 0;
+    let overduePoints = 0;
+    let completedCount = 0;
+    let overdueCount = 0;
+
+    activeTasks.forEach((t) => {
+      if (!t.due_date) return;
+      const due = new Date(t.due_date);
+      due.setHours(0, 0, 0, 0);
+
+      const priorityWeights = { low: 1, medium: 2, high: 3 };
+      const pWeight = priorityWeights[t.priority] || 1;
+
+      if (t.is_completed) {
+        completedCount++;
+        const completedDate = t.completed_at ? new Date(t.completed_at) : new Date();
+        completedDate.setHours(0, 0, 0, 0);
+        const diffTime = completedDate.getTime() - due.getTime();
+        let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        diffDays = Math.max(-14, Math.min(30, diffDays));
+        const contribution = diffDays * pWeight * 4;
+        totalPoints += contribution;
+        completedPoints += contribution;
+      } else {
+        overdueCount++;
+        const diffTime = today.getTime() - due.getTime();
+        let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        diffDays = Math.min(30, diffDays);
+        const contribution = diffDays * pWeight * 5;
+        totalPoints += contribution;
+        overduePoints += contribution;
+      }
+    });
+
+    const score = Math.round((totalPoints / activeTasks.length) * 10) / 10;
+
+    return {
+      score,
+      activeCount: activeTasks.length,
+      completedCount,
+      overdueCount,
+      completedPoints,
+      overduePoints
+    };
+  }, [tasks]);
+
   // Handle local mock session & Supabase Auth listeners
   useEffect(() => {
     let active = true;
@@ -229,6 +303,22 @@ export default function Home() {
       } catch (err) {
         console.error('Failed to delete task:', err);
         alert('Error deleting task.');
+      }
+    }
+  };
+
+  const handleStartOver = async () => {
+    if (!user) return;
+    if (confirm('Are you sure you want to delete all tasks and start fresh? This cannot be undone.')) {
+      try {
+        setLoading(true);
+        await taskService.deleteAllTasks(user.id);
+        setTasks([]);
+      } catch (err) {
+        console.error('Failed to reset tasks:', err);
+        alert('Error starting over.');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -498,13 +588,25 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start flex-grow">
             {/* Left Side: Create Task Card */}
             <div className="lg:col-span-3 sticky top-6">
-              <div className="glass rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 text-zinc-800 pointer-events-none">
-                  <Sparkles size={40} className="opacity-10" />
+              <div className="glass bg-emerald-950/10 border-emerald-500/20 shadow-[0_0_25px_rgba(16,185,129,0.02)] rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 text-emerald-800/15 pointer-events-none">
+                  <Sparkles size={40} className="opacity-20 animate-pulse" />
                 </div>
-                <h2 className="text-lg font-bold text-white mb-1.5">Create New Task</h2>
+                <h2 className="text-lg font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                  Create New Task
+                </h2>
                 <p className="text-xs text-zinc-400 mb-5">Draft a new item and track your milestones.</p>
                 <TaskForm onSubmit={handleAddTask} isSubmitting={submitting} />
+                
+                {/* Start Over Button */}
+                <div className="mt-5 pt-5 border-t border-zinc-900/60">
+                  <button
+                    onClick={handleStartOver}
+                    className="w-full bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] border border-rose-500/25 hover:border-rose-500/40 text-rose-455 text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-sm shadow-rose-950/10"
+                  >
+                    <span>Start Over From Fresh</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -587,6 +689,20 @@ export default function Home() {
                         );
                       })}
                     </div>
+                  </div>
+
+                  {/* Tamas Score Badge in Dashboard Controls */}
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-zinc-850 bg-zinc-950/40 text-xs font-semibold text-zinc-400">
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Tamas Score:</span>
+                    {tamasData.score !== null ? (
+                      <span className={`font-mono font-extrabold ${
+                        tamasData.score < 0 ? 'text-emerald-400' : tamasData.score > 0 ? 'text-rose-455' : 'text-zinc-300'
+                      }`}>
+                        {tamasData.score > 0 ? `+${tamasData.score}` : tamasData.score}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-650 font-mono">N/A</span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500 bg-zinc-950/40 border border-zinc-850/50 px-3 py-1 rounded-lg">
@@ -951,23 +1067,16 @@ export default function Home() {
                 </div>
                 <h3 className="text-sm font-bold text-zinc-350 tracking-wider uppercase mb-4">Tamas Score</h3>
                       {(() => {
-                  const tasksWithDeadline = tasks.filter(t => t.due_date);
-                  
-                  // Active tasks are completed tasks OR incomplete overdue tasks
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
+                  const {
+                    score: normalizedScore,
+                    activeCount,
+                    completedCount,
+                    overdueCount,
+                    completedPoints,
+                    overduePoints
+                  } = tamasData;
 
-                  const activeTasks = tasksWithDeadline.filter(t => {
-                    if (t.is_completed) return true;
-                    if (t.due_date) {
-                      const due = new Date(t.due_date);
-                      due.setHours(0, 0, 0, 0);
-                      return today > due; // Only count incomplete if it is overdue
-                    }
-                    return false;
-                  });
-                  
-                  if (activeTasks.length === 0) {
+                  if (activeCount === 0 || normalizedScore === null) {
                     return (
                       <div className="text-center py-8">
                         <div className="h-10 w-10 rounded-full bg-zinc-900 border border-zinc-850 text-zinc-550 flex items-center justify-center mx-auto mb-3">
@@ -980,52 +1089,6 @@ export default function Home() {
                       </div>
                     );
                   }
-
-                  let totalPoints = 0;
-                  let completedPoints = 0;
-                  let overduePoints = 0;
-                  
-                  let completedCount = 0;
-                  let overdueCount = 0;
-
-                  activeTasks.forEach(t => {
-                    if (!t.due_date) return;
-                    const due = new Date(t.due_date);
-                    due.setHours(0, 0, 0, 0);
-                    
-                    const priorityWeights = { low: 1, medium: 2, high: 3 };
-                    const pWeight = priorityWeights[t.priority] || 1;
-
-                    if (t.is_completed) {
-                      completedCount++;
-                      const completedDate = t.completed_at ? new Date(t.completed_at) : new Date();
-                      completedDate.setHours(0, 0, 0, 0);
-                      const diffTime = completedDate.getTime() - due.getTime();
-                      let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                      
-                      // Cap reward at -14 days (2 weeks early) and penalty at +30 days (1 month late)
-                      // to prevent massive outliers from breaking the score's active utility
-                      diffDays = Math.max(-14, Math.min(30, diffDays));
-                      
-                      const contribution = diffDays * pWeight * 4;
-                      totalPoints += contribution;
-                      completedPoints += contribution;
-                    } else {
-                      overdueCount++;
-                      const diffTime = today.getTime() - due.getTime();
-                      let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                      
-                      // Cap penalty at +30 days (1 month late)
-                      diffDays = Math.min(30, diffDays);
-                      
-                      const contribution = diffDays * pWeight * 5;
-                      totalPoints += contribution;
-                      overduePoints += contribution;
-                    }
-                  });
-
-                  // Normalize by dividing by the number of active tasks to prevent task-volume bias
-                  const normalizedScore = Math.round((totalPoints / activeTasks.length) * 10) / 10;
 
                   let scoreColor = 'text-indigo-400';
                   let scoreBg = 'from-indigo-500/10 to-purple-500/5 border-indigo-500/10';
